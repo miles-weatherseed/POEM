@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "POEM"
+version = "0.1.0"
+description = "A Predictor Of (Immunogenic) Epitopes using Mechanistic modelling of the Class I antigen presentation pathway."
+authors = [
+  { name="Miles Weatherseed", email="miles.weatherseed@st-annes.ox.ac.uk" }
+]
+dependencies = [
+  "numpy>=1.21.0",
+  "pandas>=1.3.0"
+  ]
