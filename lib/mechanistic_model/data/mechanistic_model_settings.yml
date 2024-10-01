@@ -1,0 +1,32 @@
+ed_parameters:
+  u_binder : 5.844493894851255e-06
+  u_nbinder : 0.0014325190562769956
+  gM : 5.529089226663578
+  gT : 1505.0
+  e : 0.007358981995481424
+  c : 9.63008680871671e-06
+  bT : 1.09885e-9
+  uT : 1.184643e-06
+  dMe : 6.152035646086772e-05
+  dP : 0.13
+  dT : 0.001725968
+  dM : 7.9892e-5
+  v : 936.3137
+  q : 21035.0
+  bER : 4.556167960235624e-09
+  g_self_er: 30000.0
+  rho_b: 0.0005859519074832306
+
+# FROM models/mechanistic_model/fits/final_fits/7410.0_20Jan_Python_0_0.1KO.txt
+hearn_fitted_parameters:
+  E0 : 1400190.523
+  u_TAP : 4.681199429
+  k_TAP : 5.00
+  T0 : 10000
+  d_cyt : 0.001572031
+  V_ER : 270990.0
+  V_TAP : 566068.0
+  g_self_cyt: 2000000
+
+configuration:
+  max_length : 16
