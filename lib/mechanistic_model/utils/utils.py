@@ -221,11 +221,12 @@ def generate_tap_training_data(
         startpoint (int): Which point in the peptide to start padding or trimming (N.B. corresponds to P_{i+1})
         encoding (str): Which encoding method to use
     """
-    train_data = pd.read_csv("poem/src/tap_dataset_processed.csv")
+    train_data = pd.read_csv(
+        "lib/mechanistic_model/data/tap_training_data.csv"
+    )
 
     train_peptides = make_length(train_data.Peptide.values, startpoint, length)
     if encoding not in VALID_ENCODINGS:
-        print("Uh oh", encoding)
         raise ValueError("Must choose a method in VALID_ENCODINGS")
 
     if encoding == "sparse":
