@@ -1,3 +1,5 @@
+import numpy as np
+
 # Maximum A Posteriori parameters from fitting data in M_Weatherseed PhD thesis
 cyt_amin_dict = {
     "R": 0.06638477867795106,
@@ -22,3 +24,17 @@ cyt_amin_dict = {
     "P": 0.006545404187764979,
     "X": 0.03350193789235774,
 }
+
+
+def get_cytamin_rates(peptides: np.ndarray) -> np.ndarray:
+    """Returns the trimming rate by cytosolic aminopeptidases based on the
+    N-terminus of the peptides
+
+    Args:
+        peptides (np.ndarray): Array containing peptides to predict cyt_amin
+        rates for
+
+    Returns:
+        np.ndarray: Trimming rates (s^-1)
+    """
+    return np.array([cyt_amin_dict[p[0]] for p in peptides])

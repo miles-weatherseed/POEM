@@ -197,7 +197,7 @@ def predict_scores(peptides: np.ndarray) -> np.ndarray:
     return np.mean(predictions, axis=1)
 
 
-def get_kcats(peptides: np.ndarray) -> np.ndarray:
+def get_erap1_kcats(peptides: np.ndarray) -> np.ndarray:
     """Takes in array of peptides and returns an array of the predicted kcats (in s^-1)
 
     Args:
@@ -211,4 +211,4 @@ def get_kcats(peptides: np.ndarray) -> np.ndarray:
 
 if __name__ == "__main__":
     # write this into tests eventually - check you get known output
-    print(get_kcats(np.array(["SIINFEKLM", "SIINYEKL"])))
+    print(get_erap1_kcats(np.array(["SIINFEKLM", "SIINYEKL"])))

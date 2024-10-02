@@ -122,9 +122,11 @@ models = [
 ]
 
 
-def predict_scores(peptides: np.ndarray, hosts: np.ndarray) -> np.ndarray:
+def predict_tap_binding_affinities(
+    peptides: np.ndarray, hosts: np.ndarray
+) -> np.ndarray:
     """Function takes in array of peptide sequences and an array of host
-    organisms. Returns log10 of the predicted TAP binding affinity (nM).
+    organisms. Returns the predicted TAP binding affinity (nM).
 
     The function can handle peptides of any length >= 8. However, the model
     is only trained using lengths up to and including 15 amino acids.
@@ -134,7 +136,7 @@ def predict_scores(peptides: np.ndarray, hosts: np.ndarray) -> np.ndarray:
         hosts (np.ndarray): Array of organisms (same length as peptides)
 
     Returns:
-        np.ndarray: log10 of predicted TAP IC50 (nM)
+        np.ndarray: predicted TAP IC50 (nM)
     """
     lengths = np.array([len(p) for p in peptides])
     preds = np.zeros((len(peptides), len(ensemble_encodings)))
@@ -143,13 +145,14 @@ def predict_scores(peptides: np.ndarray, hosts: np.ndarray) -> np.ndarray:
         X = encode_tap_peptides(peptides, hosts, PAD_START, enc, PAD_LENGTH)
         X = append_sparse_length(X, lengths)
         preds[:, j] = model.predict(X)
-    # return arithmetic mean across ensemble
-    return np.mean(preds, axis=1)
+    # return arithmetic mean across ensemble, raised to power of 10 to reverse
+    # log scaling
+    return 10 ** np.mean(preds, axis=1)
 
 
 if __name__ == "__main__":
     print(
-        predict_scores(
+        predict_tap_binding_affinities(
             np.array(["QLESIINFEKL", "FSIINFEKL"]),
             np.array(["Human", "Mouse"]),
         )

@@ -1,4 +1,10 @@
 import argparse
+from affinities import get_netmhc, get_netmhcpan
+from erap1 import get_kcats
+from cytosolic_aminopeptidases import get_cytamin_rates
+from tap import predict_tap_binding_affinities
+from tapasin_dependence import get_allele_bER
+from proteasome import get_proteasome_product_probabilities
 
 
 def main():
