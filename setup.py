@@ -22,8 +22,8 @@ setup(
     install_requires=read_requirements(),
     entry_points={
         "console_scripts": [
-            "poem=poem.main:main",  # This maps 'poem' to a function in your code
-            "mech=mechanistic_model.main:main",
+            "poem=poem.main:main",
+            "classi_presentation=mechanistic_model.main:main",
         ],
     },
 )

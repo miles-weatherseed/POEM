@@ -17,6 +17,7 @@ def main():
         "-p",
         "--input_peptides",
         help="Path to the input peptides CSV file.",
+        type=str,
         required=True,
     )
 
@@ -25,7 +26,18 @@ def main():
         "-d",
         "--fasta_dir",
         help="Path to the directory containing FASTA files.",
+        type=str,
         required=True,
+    )
+
+    # Adding -c for clean_up
+    parser.add_argument(
+        "-c",
+        "--clean_up",
+        help="Whether or not to clean up the files after completion (default=True)",
+        type=bool,
+        default=True,
+        required=False,
     )
 
     # Parse the arguments
