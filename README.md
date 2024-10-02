@@ -11,6 +11,7 @@ The source code is split into two sections:
 
 2) **POEM** - this is a binary classifier trained using the PRIME2.0 dataset (Gfeller *et al*, 2021) to predict CD8+ immunogenicity. As input features, the predictor uses the ouput of the mechanistic model, along with MHC-I pseudosequence, peptide length, and predicted peptide TCR-interaction properties.
 
+
 ## Installation
 
 POEM is written primarily in Python and should be compatible with Python>=3.7. To avoid conflicts in dependencies, it is recommended that users create a new virtual environment for POEM:
@@ -49,6 +50,8 @@ Python dependencies are in the file `requirements.txt`. To install these, run
 pip install -r requirements.txt
 ```
 
+---
+
 ### Installation of POEM using pip
 
 Once the source code has been downloaded and the requisite packages installed, POEM can be installed using pip. From the base directory of POEM, run
@@ -60,6 +63,8 @@ pip install -e .
 Once installed, POEM's two modules can be run from anywhere on your machine. The mechanistic model can be called using `classi_presentation`. The immunogenicity predictor can be called using `poem`. 
 
 To see the arguments these algorithms take, use the `-h` flag.
+
+---
 
 ### Installation of non-proprietry algorithms
 
