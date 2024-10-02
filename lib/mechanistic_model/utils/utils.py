@@ -2,7 +2,10 @@ import numpy as np
 import pandas as pd
 from Bio.Align import substitution_matrices
 import json
-import mhcgnomes
+import os
+
+# Get the absolute path to the directory where this script resides
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # load substitution matrices, define AAs and load in physicochemical features
 SUBS_MATRICES = substitution_matrices.load()
@@ -30,7 +33,7 @@ AMINO_ACIDS = [
     "X",
 ]  # canonical amino acids
 PHYSICO_DICT = json.load(
-    open("lib/mechanistic_model/utils/aaindex1_pca.json", "r")
+    open(os.path.join(current_dir, "aaindex1_pca.json"), "r")
 )
 VALID_ENCODINGS = [x.lower() for x in SUBS_MATRICES] + [
     "physico",
@@ -222,7 +225,9 @@ def generate_tap_training_data(
         encoding (str): Which encoding method to use
     """
     train_data = pd.read_csv(
-        "lib/mechanistic_model/data/tap_training_data.csv"
+        os.path.abspath(
+            os.path.join(current_dir, "..", "data", "tap_training_data.csv")
+        ),
     )
 
     train_peptides = make_length(train_data.Peptide.values, startpoint, length)

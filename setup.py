@@ -15,6 +15,10 @@ setup(
     version="0.1",
     packages=find_packages("lib"),  # Adjust this to your package directory
     package_dir={"": "lib"},  # Point to the directory containing your modules
+    include_package_data=True,
+    package_data={
+        "mechanistic_model": ["utils/*.json", "data/*.csv", "data/*.dat"]
+    },  # Include JSON files
     install_requires=read_requirements(),
     entry_points={
         "console_scripts": [

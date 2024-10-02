@@ -4,6 +4,9 @@ from Bio.Align import substitution_matrices
 import os
 import mhcgnomes
 
+# Get the absolute path to the directory where this script resides
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 def encode_to_blosum62(aa_string: str) -> np.ndarray:
     """Snippet to convert a string of amino acids to BLOSUM62 encoding
@@ -64,10 +67,10 @@ def get_nearest_neighbour_TD(
 def create_TD_database():
     # numpy files with bERs and corresponding TDs from simulating mechanistic model
     MHC_seq_database = pd.read_csv(
-        "lib/mechanistic_model/data/netmhcpan_pseudo.dat", sep=r"\s+"
+        os.path.join(current_dir, "data", "netmhcpan_pseudo.dat"), sep=r"\s+"
     )
     bashirova_data = pd.read_csv(
-        "lib/mechanistic_model/data/bashirova_database.csv"
+        os.path.join(current_dir, "data", "bashirova_database.csv")
     )
     bashirova_alleles = []
     for a in bashirova_data.Allele.values:
@@ -115,7 +118,9 @@ def create_TD_database():
     MHC_seq_database["TD"] = TD_list
     MHC_seq_database["bER"] = bER_list
     MHC_seq_database.to_csv(
-        "lib/mechanistic_model/cache/tapasin_dependence/allele_to_bER.csv",
+        os.path.join(
+            current_dir, "cache", "tapasin_dependence", "allele_to_bER.csv"
+        ),
         index=False,
     )
     return
@@ -123,11 +128,15 @@ def create_TD_database():
 
 # upon installation, create the larger database using nearest neighbour
 if not os.path.exists(
-    "lib/mechanistic_model/cache/tapasin_dependence/allele_to_bER.csv"
+    os.path.join(
+        current_dir, "cache", "tapasin_dependence", "allele_to_bER.csv"
+    ),
 ):
     create_TD_database()
 TD_database = pd.read_csv(
-    "lib/mechanistic_model/cache/tapasin_dependence/allele_to_bER.csv"
+    os.path.join(
+        current_dir, "cache", "tapasin_dependence", "allele_to_bER.csv"
+    ),
 )
 
 

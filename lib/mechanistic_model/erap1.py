@@ -13,6 +13,9 @@ from mechanistic_model.utils.utils import (
 import joblib
 import os
 
+# Get the absolute path to the directory where this script resides
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 PAD_START = 5
 PAD_LENGTH = 11
 
@@ -78,7 +81,9 @@ def generate_ensemble_models():
     compatability issues
     """
     # load training data
-    data = pd.read_csv("lib/mechanistic_model/data/erap1_training_data.csv")
+    data = pd.read_csv(
+        os.path.join(current_dir, "data", "erap1_training_data.csv")
+    )
     # count number of times each peptide appears in data
     data["count"] = [
         sum(data.peptide.values == p) for p in data.peptide.values
@@ -158,7 +163,7 @@ def train_models(
 if any(
     [
         not os.path.exists(
-            f"lib/mechanistic_model/cache/erap1_models/{enc}.reg"
+            os.path.join(current_dir, "cache", f"erap1_models/{enc}.reg")
         )
         for enc in encodings
     ]
@@ -167,7 +172,9 @@ if any(
 
 models = [
     joblib.load(
-        open(f"lib/mechanistic_model/cache/erap1_models/{enc}.reg", "rb")
+        open(
+            os.path.join(current_dir, "cache", f"erap1_models/{enc}.reg"), "rb"
+        )
     )
     for enc in encodings
 ]

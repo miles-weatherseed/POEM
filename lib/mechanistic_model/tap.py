@@ -9,6 +9,8 @@ from mechanistic_model.utils.utils import (
     generate_tap_training_data,
 )
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 PAD_START = 3
 PAD_LENGTH = 11
 ensemble_encodings = [
@@ -100,7 +102,10 @@ def generate_ensemble_models():
     for enc, model in zip(ensemble_encodings, trained_models):
         joblib.dump(
             model,
-            open(f"lib/mechanistic_model/cache/tap_models/{enc}.reg", "wb"),
+            open(
+                os.path.join(current_dir, "cache", f"tap_models/{enc}.reg"),
+                "wb",
+            ),
             protocol=5,
         )
 
@@ -108,7 +113,9 @@ def generate_ensemble_models():
 # if cache of ensemble models doesn't exist, we should re-train it
 if any(
     [
-        not os.path.exists(f"lib/mechanistic_model/cache/tap_models/{enc}.reg")
+        not os.path.exists(
+            os.path.join(current_dir, "cache", f"tap_models/{enc}.reg")
+        )
         for enc in ensemble_encodings
     ]
 ):
@@ -116,7 +123,7 @@ if any(
 
 models = [
     joblib.load(
-        open(f"lib/mechanistic_model/cache/tap_models/{enc}.reg", "rb")
+        open(os.path.join(current_dir, "cache", f"tap_models/{enc}.reg"), "rb")
     )
     for enc in ensemble_encodings
 ]
