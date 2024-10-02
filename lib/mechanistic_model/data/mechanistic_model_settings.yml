@@ -30,3 +30,5 @@ hearn_fitted_parameters:
 
 configuration:
   max_length : 16
+  pepsickle_version: 0
+  mhci_affinity_algorithm: "NetMHC"

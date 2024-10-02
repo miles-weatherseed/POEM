@@ -130,7 +130,7 @@ models = [
 
 
 def predict_tap_binding_affinities(
-    peptides: np.ndarray, hosts: np.ndarray
+    peptides: np.ndarray, host: str
 ) -> np.ndarray:
     """Function takes in array of peptide sequences and an array of host
     organisms. Returns the predicted TAP binding affinity (nM).
@@ -140,13 +140,14 @@ def predict_tap_binding_affinities(
 
     Args:
         peptides (np.ndarray): Array of peptide sequences (lengths >= 8)
-        hosts (np.ndarray): Array of organisms (same length as peptides)
+        host (str): Host organism
 
     Returns:
         np.ndarray: predicted TAP IC50 (nM)
     """
     lengths = np.array([len(p) for p in peptides])
     preds = np.zeros((len(peptides), len(ensemble_encodings)))
+    hosts = np.array([host for _ in range(len(peptides))])
     for j, enc in enumerate(ensemble_encodings):
         model = models[j]
         X = encode_tap_peptides(peptides, hosts, PAD_START, enc, PAD_LENGTH)

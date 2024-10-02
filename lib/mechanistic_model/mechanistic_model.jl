@@ -199,8 +199,8 @@ gPs = 100.0 .* npzread(joinpath(input_dir, "gPs.npy"))
 TAP_BAs = npzread(joinpath(input_dir, "TAP_BAs.npy"))
 cytamin_in = npzread(joinpath(input_dir, "cytamin_in.npy"))
 cytamin_out = npzread(joinpath(input_dir, "cytamin_out.npy"))
-erap1_kcat_out = npzread(joinpath(input_dir, "erap1_kcat_in.npy"))
-erap1_kcat_in = npzread(joinpath(input_dir, "erap1_kcat_out.npy"))
+erap1_kcat_in = npzread(joinpath(input_dir, "erap1_kcat_in.npy"))
+erap1_kcat_out = npzread(joinpath(input_dir, "erap1_kcat_out.npy"))
 bs = 10 .^ npzread(joinpath(input_dir, "bERs.npy"))
 us = bs .* 1e-3 .* v_ER .* npzread(joinpath(input_dir, "mhci_affinities.npy"))
 
@@ -247,5 +247,4 @@ outputs = zeros(size(gPs))
 end
 
 # write the final pMHC levels to a numpy formatted file
-npzread(joinpath(input_dir, "erap1_kcat_in.npy"))
 npzwrite(joinpath(input_dir, "pmhc_levels.npy"), outputs)

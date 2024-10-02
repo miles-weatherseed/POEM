@@ -271,6 +271,155 @@ def get_proteasome_product_probabilities(
     return output
 
 
+def get_proteasome_product_probabilities_from_preprocessed(
+    pepsickle_out: np.ndarray,
+    model_idx: int,
+    startpoints: np.ndarray,
+    lengths: np.ndarray,
+    direction: Optional[str] = "both",
+    pepsickle_version: Optional[str] = "I",
+) -> np.ndarray:
+    """In some cases we may not want to keep running Pepsickle on
+    the same fastas so we can pass the outputs to this function and
+    return the probability of peptides being formed in a numpy array.
+
+    N.B. we replace the cleavage probability of the C-terminus with 1.
+
+    Models:
+
+    [0] Pepsickle epitope
+    [1] Pepsickle in-vitro
+    [2] Pepsickle in-vitro-2
+
+    Args:
+        pepsickle_out (np.ndarray): The output of the Pepsickle algorithm in array form
+        model_idx (int): Index of Pepsickle model to use
+        startpoints (np.ndarray): Indexes of starts of peptides being formed from the protein
+        lengths (np.ndarray): Lengths of peptides being formed from the protein
+        direction (Optional[str], optional): Direction of proteasomal digestion. Defaults to "both".
+        pepsickle_version (Optional[str], optional): Whether to use constitutive ("C") or immunoproteasome ("I"). Defaults to "I".
+
+    Returns:
+        np.ndarray: Array of peptide formation probabilities
+    """
+    # calculates p from p_hat
+    gamma, r = param_dict[model_idx]
+    l = 3
+    assert len(startpoints) == len(lengths)
+    output = np.zeros(len(startpoints))
+    if direction == "N":
+        p_hat = np.hstack(
+            [
+                1.0,
+                gamma * pepsickle_out[:-1],
+                1.0,
+            ]
+        )
+
+        # hold pX probabilities from 1 to l inclusive
+        pX = np.zeros((len(p_hat), l))
+        p = np.zeros_like(p_hat)
+        pX[0, 0] = 0  # X_{-1} undefined so set to 0
+        p[0] = 1
+        for i in range(1, len(p) - 1):
+            pX[i, 0] = p[i - 1]
+            for j in range(1, l):
+                pX[i, j] = pX[i - 1, j - 1] * (1 - r * p_hat[i - 1])
+            p[i] = p_hat[i] * (1 - np.sum(pX[i, :])) + r * p_hat[i] * np.sum(
+                pX[i, :]
+            )
+        p[-1] = 1  # C-terminus already cleaved
+
+        for i, (s, length) in enumerate(zip(startpoints, lengths)):
+            output[i] = calculate_Pij(s, s + length - 1, p, p_hat, r)
+
+    elif direction == "C":
+        p_hat = np.hstack(
+            [
+                1.0,
+                gamma * pepsickle_out[:-1:-1],
+                1.0,
+            ]
+        )
+
+        # hold pX probabilities from 1 to l inclusive
+        pX = np.zeros((len(p_hat), l))
+        p = np.zeros_like(p_hat)
+        pX[0, 0] = 0  # X_{-1} undefined so set to 0
+        p[0] = 1
+        for i in range(1, len(p) - 1):
+            pX[i, 0] = p[i - 1]
+            for j in range(1, l):
+                pX[i, j] = pX[i - 1, j - 1] * (1 - r * p_hat[i - 1])
+            p[i] = p_hat[i] * (1 - np.sum(pX[i, :])) + r * p_hat[i] * np.sum(
+                pX[i, :]
+            )
+        p[-1] = 1  # C-terminus already cleaved
+
+        for i, (s, length) in enumerate(zip(startpoints, lengths)):
+            output[i] = calculate_Pij(
+                len(p) - s - length - 1, len(p) - 2 - s, p, p_hat, r
+            )
+
+    elif direction == "both":
+        # have to replace the last score with a 1 because C-terminus is already cleaved
+        algo_out = pepsickle_out[:-1]
+        p_hat_N = np.hstack(
+            [
+                1.0,
+                gamma * algo_out,
+                1.0,
+            ]
+        )
+        p_hat_C = np.hstack(
+            [
+                1.0,
+                gamma * algo_out[::-1],
+                1.0,
+            ]
+        )
+
+        # hold pX probabilities from 1 to l inclusive
+        pX_N = np.zeros((len(p_hat_N), l))
+        pX_C = np.zeros((len(p_hat_C), l))
+        p_N = np.zeros_like(p_hat_N)
+        p_C = np.zeros_like(p_hat_C)
+        pX_N[0, 0] = 0  # X_{-1} undefined so set to 0
+        pX_C[0, 0] = 0  # X_{-1} undefined so set to 0
+        p_N[0] = 1
+        p_C[0] = 1
+        for i in range(1, len(p_N) - 1):
+            pX_N[i, 0] = p_N[i - 1]
+            pX_C[i, 0] = p_C[i - 1]
+            for j in range(1, l):
+                pX_N[i, j] = pX_N[i - 1, j - 1] * (1 - r * p_hat_N[i - 1])
+                pX_C[i, j] = pX_C[i - 1, j - 1] * (1 - r * p_hat_C[i - 1])
+            p_N[i] = p_hat_N[i] * (1 - np.sum(pX_N[i, :])) + r * p_hat_N[
+                i
+            ] * np.sum(pX_N[i, :])
+            p_C[i] = p_hat_C[i] * (1 - np.sum(pX_C[i, :])) + r * p_hat_C[
+                i
+            ] * np.sum(pX_C[i, :])
+        p_N[-1] = 1  # C-terminus already cleaved
+        p_C[-1] = 1  # C-terminus already cleaved
+
+        for i, (s, length) in enumerate(zip(startpoints, lengths)):
+            output[i] = 0.5 * (
+                calculate_Pij(s, s + length - 1, p_N, p_hat_N, r)
+                + calculate_Pij(
+                    len(p_C) - s - length - 1,
+                    len(p_C) - 2 - s,
+                    p_C,
+                    p_hat_C,
+                    r,
+                )
+            )
+
+    else:
+        raise ValueError("Direction must be one of 'N', 'C', or 'both'")
+    return output
+
+
 if __name__ == "__main__":
     fasta_filepath = "test/test.fasta"
     print(run_algos(fasta_filepath, model_idx=2, pepsickle_version="I"))
