@@ -147,55 +147,7 @@ def make_length(peptides: np.ndarray, start: int, length: int) -> list:
     return output
 
 
-# FUNCTIONS TO HANDLE LARGE PROTEINS
-
-
-def find_peptide_precursors(
-    length: int, fasta_sequence: str, lengths: list, start_position: int
-):
-    end_position = start_position + length - 1
-    peptides = [
-        "A" * max(-(end_position - x + 1), 0)
-        + fasta_sequence[max(end_position - x + 1, 0) : end_position + 1]
-        for x in lengths
-    ]  # pre-pad with alanine if needed - the proteasome model will capture that this doesn't exist
-    return peptides
-
-
-def protein_to_peptides(protein_sequence: str):
-    # this returns a list of startpoint and list of endpoints of the peptides we must keep track of, in order
-    N = len(protein_sequence)
-    startpoints = []
-    endpoints = []
-    # initial peptides
-    for i in range(7, 15):
-        for j in range(i - 7 + 1):
-            startpoints.append(j)
-            endpoints.append(i)
-    for i in range(15, N):
-        for j in range(i - 15, i - 6):
-            startpoints.append(j)
-            endpoints.append(i)
-
-    lengths = [e - s + 1 for s, e in zip(startpoints, endpoints)]
-
-    return startpoints, endpoints, lengths
-
-
-def out_to_in(out_rates: np.ndarray):
-    # This function will take catalytic rates corresponding to ERAP1 and cytosolic aminopeptidases for the peptides in the system
-    # It will return a new array containing these rates rearranged to so that the precursor is in the corresponding index
-    in_rates = np.zeros_like(out_rates)
-    N = int(len(out_rates) / 9 + 11)
-    for i in range(7, 15):
-        start = int(0.5 * (i - 7) * (i - 6))
-        for j in range(1, i - 7 + 1):
-            in_rates[start + j] = out_rates[start + j - 1]
-    for i in range(15, N):
-        start = 36 + (i - 15) * 9
-        for j in range(1, 9):
-            in_rates[start + j] = out_rates[start + j - 1]
-    return in_rates
+# TAP MODEL SPECIFIC FUNCTIONS
 
 
 def encode_tap_allele(alleles: np.ndarray) -> list:
@@ -290,6 +242,83 @@ def encode_tap_peptides(
     X = np.hstack([peptide_encodings, tap_encodings])
 
     return X
+
+
+# FUNCTIONS TO HANDLE LARGE PROTEINS
+
+
+def find_peptide_precursors(
+    peptide_length: int,
+    fasta_sequence: str,
+    start_position: int,
+    mech_lengths: np.ndarray = np.arange(8, 17)[::-1],
+) -> np.ndarray:
+    """Given the length of the peptide of interest, the fasta sequence, the
+    lengths of the peptides to track in the mechanistic model, and the start
+    position of the peptide of interest, this function returns an array of the
+    peptides to be considered explicitly in the mechanistic model.
+
+    Args:
+        peptide_length (int): The length of the peptide of interest (i.e. from
+        the input .csv file)
+        fasta_sequence (str): The sequence of the source protein from the
+        fasta file
+        start_position (int): The index of the start of the peptide of interest
+        mech_lengths (np.ndarray): The lengths of peptides to be considered in
+        the mechhanistic model
+
+    Returns:
+        np.ndarray: An array containing the peptide sequences extracted from
+        the fasta sequence
+    """
+    end_position = start_position + peptide_length - 1
+    # If the precursors do not exist (i.e. the peptide is near the N-terminus),
+    # we pre-pad with alanine - the proteasome model will capture that these
+    # peptides don't exist
+    peptides = np.array(
+        [
+            "A" * max(-(end_position - x + 1), 0)
+            + fasta_sequence[max(end_position - x + 1, 0) : end_position + 1]
+            for x in mech_lengths
+        ]
+    )
+    return peptides
+
+
+def protein_to_peptides(protein_sequence: str):
+    # this returns a list of startpoint and list of endpoints of the peptides we must keep track of, in order
+    N = len(protein_sequence)
+    startpoints = []
+    endpoints = []
+    # initial peptides
+    for i in range(7, 15):
+        for j in range(i - 7 + 1):
+            startpoints.append(j)
+            endpoints.append(i)
+    for i in range(15, N):
+        for j in range(i - 15, i - 6):
+            startpoints.append(j)
+            endpoints.append(i)
+
+    lengths = [e - s + 1 for s, e in zip(startpoints, endpoints)]
+
+    return startpoints, endpoints, lengths
+
+
+def out_to_in(out_rates: np.ndarray):
+    # This function will take catalytic rates corresponding to ERAP1 and cytosolic aminopeptidases for the peptides in the system
+    # It will return a new array containing these rates rearranged to so that the precursor is in the corresponding index
+    in_rates = np.zeros_like(out_rates)
+    N = int(len(out_rates) / 9 + 11)
+    for i in range(7, 15):
+        start = int(0.5 * (i - 7) * (i - 6))
+        for j in range(1, i - 7 + 1):
+            in_rates[start + j] = out_rates[start + j - 1]
+    for i in range(15, N):
+        start = 36 + (i - 15) * 9
+        for j in range(1, 9):
+            in_rates[start + j] = out_rates[start + j - 1]
+    return in_rates
 
 
 # NETMHCPAN_PSEUDOSEQUENCES = pd.read_csv(
