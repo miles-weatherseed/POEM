@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVR
-from utils.utils import (
+from mechanistic_model.utils.utils import (
     make_length,
     sparse_peptide_encoding,
     VALID_ENCODINGS,

@@ -1,5 +1,5 @@
 # POEM
-*POEM project for @miles-weatherseed and @MichaelEBryan to work on.*
+*POEM project for [@miles-weatherseed](https://github.com/miles-weatherseed) and [@MichaelEBryan](https://github.com/MichaelEBryan) to work on.*
 
 ## About
 

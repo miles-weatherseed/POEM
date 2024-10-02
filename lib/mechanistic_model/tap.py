@@ -4,7 +4,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVR
 import joblib
 import os
-from utils.utils import (
+from mechanistic_model.utils.utils import (
     encode_tap_peptides,
     generate_tap_training_data,
 )
