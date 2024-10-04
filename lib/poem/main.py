@@ -8,9 +8,9 @@ from typing import Dict, Any
 import tensorflow as tf
 import joblib
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
+from scikeras.wrappers import KerasClassifier
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.optimizers import SGD, Adam
 from poem.utils.utils import make_poem_input_layer, VALID_ENCODINGS
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -100,25 +100,14 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
 
     poem_target = training_data["immunogenicity"]
 
-    # determine architecture of MLP
-    model = Sequential()
-    model.add(
-        Dense(256, input_dim=20, activation="relu")
-    )  # Adjust input_dim based on your features
-    model.add(Dense(8, activation="relu"))
-    model.add(
-        Dense(1, activation="sigmoid")
-    )  # For binary classification; change if needed
-    model.compile(
-        optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"]
-    )
-
     # create a pipeline to hold the scaler and the regressor
     mlp_classifier = KerasClassifier(
-        build_fn=create_mlp,
+        model=create_mlp,
         epochs=config["training"]["epochs"],
         batch_size=config["training"]["batch_size"],
         verbose=0,
+        config=config,
+        input_dim=poem_input.shape[1],
     )
     if config["dataset"]["normalization"] == "minmax":
         pipeline = Pipeline(
@@ -165,24 +154,21 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
                 test_size=config["training"]["validation_split"],
                 shuffle=True,
             )
-            pipeline.fit(
-                X_train_t,
-                y_train_t,
-                validation_data=(X_train_v, y_train_v),
-                epochs=config["training"]["epochs"],
-                callbacks=[
+            fit_params = {
+                "mlp__validation_data": (X_train_v, y_train_v),
+                "mlp__callbacks": [
                     EarlyStopping(
                         monitor="val_loss",
                         patience=config["training"]["early_stopping"][
                             "patience"
                         ],
-                        restore_best_weight=config["training"][
+                        restore_best_weights=config["training"][
                             "early_stopping"
                         ]["restore_best_weights"],
                     )
                 ],
-                verbose=0,
-            )
+            }
+            pipeline.fit(X_train_t, y_train_t, **fit_params)
         else:
             pipeline.fit(
                 X_train,
@@ -208,22 +194,20 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
             test_size=config["training"]["validation_split"],
             shuffle=True,
         )
-        pipeline.fit(
-            X_train_t,
-            y_train_t,
-            validation_data=(X_train_v, y_train_v),
-            epochs=config["training"]["epochs"],
-            callbacks=[
+        fit_params = {
+            "mlp__validation_data": (X_train_v, y_train_v),
+            "mlp__callbacks": [
                 EarlyStopping(
                     monitor="val_loss",
                     patience=config["training"]["early_stopping"]["patience"],
-                    restore_best_weight=config["training"]["early_stopping"][
+                    restore_best_weights=config["training"]["early_stopping"][
                         "restore_best_weights"
                     ],
                 )
             ],
-            verbose=0,
-        )
+        }
+
+        pipeline.fit(X_train_t, y_train_t, **fit_params)
     else:
         pipeline.fit(
             X_train,
@@ -427,29 +411,28 @@ def validate_yaml_numerical_inputs(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def fix_random_states(random_seed: int):
     random.seed(random_seed)
-    tf.random.set_seed(random)
+    # tf.random.set_seed(random)
 
 
 def create_mlp(config: Dict[str, Any], input_dim: int):
     model = Sequential()
+    model.add(Input(shape=(input_dim,)))
     if isinstance(config["model"]["hidden_layers"], int):
         # we have a single hidden layer
         model.add(
             Dense(
                 config["model"]["hidden_layers"],
-                input_dim,
                 activation=config["model"]["activation"],
             )
-        )  # Adjust input_dim based on your features
+        )
     else:
         hidden_layers = config["model"]["hidden_layers"]
         model.add(
             Dense(
                 hidden_layers[0],
-                input_dim,
                 activation=config["model"]["activation"],
             )
-        )  # Adjust input_dim based on your features
+        )
         for i in range(1, len(hidden_layers)):
             model.add(
                 Dense(
@@ -458,9 +441,7 @@ def create_mlp(config: Dict[str, Any], input_dim: int):
                 )
             )
     # create output layer
-    model.add(
-        Dense(1, activation=config["model"]["output_activation"])
-    )  # For binary classification; change if needed
+    model.add(Dense(1, activation=config["model"]["output_activation"]))
 
     # define optimizer
     if config["training"]["optimizer"] == "sgd":
@@ -471,7 +452,7 @@ def create_mlp(config: Dict[str, Any], input_dim: int):
     # compile model
     model.compile(
         optimizer=optimizer,
-        loss=config["model"]["loss_function"],
+        loss=config["training"]["loss_function"],
         metrics=["accuracy"],
     )
     return model

@@ -71,7 +71,6 @@ def main():
         "-o",
         "--host_organism",
         help="Which animal to run the TAP model for.",
-        type=str,
         default="Human",
         required=False,
         choices=["Human", "Mouse", "Rat_a", "Rat_u"],
