@@ -97,6 +97,8 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
         config["dataset"]["mhci_sequence"],
         config["dataset"]["tcr_encoding"],
     )
+    np.save("poem_input.npy", poem_input)
+    poem_input = StandardScaler().fit_transform(poem_input)
 
     poem_target = training_data["immunogenicity"]
 
@@ -136,12 +138,16 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
     # create K folds
     if config["training"]["stratified"]:
         kf = StratifiedKFold(
-            n_splits=config["training"]["kfolds"], shuffle=True
+            n_splits=config["training"]["kfolds"],
+            shuffle=True,
+            random_state=config["training"]["random_seed"],
         ).split(poem_input, poem_target)
     else:
-        kf = KFold(n_splits=config["training"]["kfolds"], shuffle=True).split(
-            poem_input, poem_target
-        )
+        kf = KFold(
+            n_splits=config["training"]["kfolds"],
+            shuffle=True,
+            random_state=config["training"]["random_seed"],
+        ).split(poem_input, poem_target)
 
     # test K-Fold performance
     for i, (train_index, test_index) in enumerate(kf):
@@ -153,6 +159,7 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
                 y_train,
                 test_size=config["training"]["validation_split"],
                 shuffle=True,
+                random_state=config["training"]["random_seed"],
             )
             fit_params = {
                 "mlp__validation_data": (X_train_v, y_train_v),
@@ -193,6 +200,7 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
             y_train,
             test_size=config["training"]["validation_split"],
             shuffle=True,
+            random_state=config["training"]["random_seed"],
         )
         fit_params = {
             "mlp__validation_data": (X_train_v, y_train_v),
@@ -212,8 +220,6 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
         pipeline.fit(
             X_train,
             y_train,
-            epochs=config["training"]["epochs"],
-            verbose=0,
         )
     if config["logging"]["save_model"]:
         joblib.dump(pipeline, config["logging"]["save_path"])
@@ -411,7 +417,8 @@ def validate_yaml_numerical_inputs(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def fix_random_states(random_seed: int):
     random.seed(random_seed)
-    # tf.random.set_seed(random)
+    np.random.seed(random_seed)
+    tf.random.set_seed(random_seed)
 
 
 def create_mlp(config: Dict[str, Any], input_dim: int):

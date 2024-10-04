@@ -5,7 +5,7 @@ dataset:
   mhci_sequence: pseudosequence  # Whether to use full sequence or pseudosequence, or None
   mhci_encoding: sparse          # How to encode the mhci_sequence, if at all
   #randoms: true                 # Whether to include random/decoys in PRIME2.0 training data - maybe shouldn't be in YAML
-  normalization: MinMax          # Whether and how to normalize input data (MinMax, Standard, None)
+  normalization: None          # Whether and how to normalize input data (MinMax, Standard, None)
 
 # Model configuration
 model:
@@ -20,7 +20,7 @@ training:
   stratified: true              # whether to use stratified K-folds
   random_seed: 42               # random seed to ensure reproducibility
   epochs: 200                   # Number of training epochs
-  batch_size: 1                 # Batch size for training
+  batch_size: 32                 # Batch size for training
   learning_rate: 0.01           # Learning rate for the optimizer
   optimizer: sgd                # Optimizer type (e.g., adam, sgd)
   loss_function: binary_crossentropy  # Loss function for classification tasks
