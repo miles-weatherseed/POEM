@@ -29,6 +29,11 @@ configuration = yaml.safe_load(
 )["configuration"]
 
 
+# Custom type function to enforce case-insensitive comparison
+def capitalise_mode(value):
+    return value.capitalize()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Process input_peptides and fasta_dir."
@@ -69,6 +74,8 @@ def main():
         type=str,
         default="Human",
         required=False,
+        choices=["Human", "Mouse", "Rat_a", "Rat_u"],
+        type=capitalise_mode,
     )
 
     # Parse the arguments

@@ -2,8 +2,14 @@ import numpy as np
 import pandas as pd
 import mhcgnomes
 import os
+from Bio.Align import substitution_matrices
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+SUBS_MATRICES = substitution_matrices.load()
+VALID_ENCODINGS = [x.lower() for x in SUBS_MATRICES] + [
+    "sparse",
+]
 
 # load in log enrichment scores from NetTepi (Calis et el.)
 enrichment_data = pd.read_csv(
@@ -104,7 +110,7 @@ def get_mia_positions(allele: str, length: int) -> tuple[list, int]:
         length (int): Peptide length
 
     Returns:
-        tuple[list, int]: Indices
+        tuple[list, int]: Indices and number of MIA residues
     """
     # returns list of postitions and a count of the number of positions
     pos = []
@@ -189,10 +195,23 @@ def get_mia_positions(allele: str, length: int) -> tuple[list, int]:
     return pos, ct
 
 
-def encode_prime2_tcr_residues(peptide: str, allele: str, plen: int):
+def encode_prime2_tcr_residues(
+    peptide: str, allele: str, plen: int
+) -> np.ndarray:
+    """Returns encoding of peptide's TCR-interaction residues using PRIME2.0
+    method.
+
+    Args:
+        peptide (str): Peptide sequence
+        allele (str): Restricting MHC-I allele name (in any format)
+        plen (int): Length of peptide
+
+    Returns:
+        np.ndarray: Array of encoding.
+    """
     # convert allele name to A0101 format
     allele = mhcgnomes.parse(allele).compact_string()
-    positions, npos = find_pos(allele, plen)
+    positions, npos = get_mia_positions(allele, plen)
     tcr_enc = np.zeros(20)
     for p in positions:
         tcr_enc[aa_order[peptide[p]]] += 1
@@ -204,52 +223,71 @@ def make_poem_input_layer(
     plens: np.ndarray,
     peptides: np.ndarray,
     mech_output: np.ndarray,
-    mhci_encoding: str = "BLOSUM50",
-    tcr_encoding: str = "NetTepi",
+    encode_length: bool = True,
+    mhci_encoding: str = "blosum50",
     mhci_rep: str = "pseudo",
+    tcr_encoding: str = "nettepi",
 ) -> np.ndarray:
-    """_summary_
+    """Produces input features for POEM.
 
     Args:
         alleles (np.ndarray): Array of MHC-I alleles
         plens (np.ndarray): Array of peptide lengths
         peptides (np.ndarray): Array of peptides
         mech_output (np.ndarray): Array of pMHC levels from mechanistic model
+        encode_length (bool): Whether or not to include a sparse peptide length
+        encoding
         mhci_encoding (str, optional): The method by which to encode the MHC-I
         allele. Defaults to "BLOSUM50".
-        tcr_encoding (str, optional): The method by which to encode the TCR
-        interaction residues. Defaults to "NetTepi".
         mhci_rep (str, optional): The type of sequence to take for MHC-I.
         Defaults to "pseudo".
+        tcr_encoding (str, optional): The method by which to encode the TCR
+        interaction residues. Defaults to "NetTepi".
 
     Returns:
         np.ndarray: Returns the input features for POEM
     """
 
-    # Encode alleles to pseudovectors
-    if mhci_rep == "pseudo":
+    # Encode MHC-I alleles
+    if mhci_rep == "pseudosequence":
         allele_vecs = np.vstack(
-            [allele_to_pseudovec(allele, enc=encoding) for allele in alleles]
+            [
+                mhci_allele_to_pseudovec(allele, enc=mhci_encoding)
+                for allele in alleles
+            ]
         )
     elif mhci_rep == "full":
         allele_vecs = np.vstack(
-            [allele_to_whole_vec(allele, enc=encoding) for allele in alleles]
-        )
-
-    # Encode peptides
-    if tcr_encoding == "NetTepi":
-        encoded_peptides = encode_nettepi_tcr_residues(peptides.reshape(-1, 1))
-    elif tcr_encoding == "PRIME":
-        encoded_peptides = np.stack(
             [
-                tcr_interaction_sites(peptides[i], alleles[i], plens[i])
+                mhci_allele_to_whole_vec(allele, enc=mhci_encoding)
+                for allele in alleles
+            ]
+        )
+    elif mhci_rep == "none":
+        allele_vecs = np.zeros((len(alleles), 0))
+
+    # Encode TCR interaction residues
+    if tcr_encoding == "nettepi":
+        tcr_encoded_peptides = encode_nettepi_tcr_residues(
+            peptides.reshape(-1, 1)
+        )
+    elif tcr_encoding == "prime":
+        tcr_encoded_peptides = np.stack(
+            [
+                encode_prime2_tcr_residues(peptides[i], alleles[i], plens[i])
                 for i in range(len(peptides))
             ]
         )
+    elif tcr_encoding == "none":
+        # create a width 0 array
+        tcr_encoded_peptides = np.zeros((len(peptides), 0))
 
     # Create length encoding
-    length_encodings = np.zeros((len(alleles), 9))
-    length_encodings[np.arange(len(alleles)), 16 - plens] = 1
+    if encode_length:
+        length_encodings = np.zeros((len(alleles), 9))
+        length_encodings[np.arange(len(alleles)), 16 - plens] = 1
+    else:
+        length_encodings = np.zeros((len(alleles), 0))
 
     # Compute log10 of mechanistic output
     log_mech_output = np.log(mech_output)
@@ -259,7 +297,7 @@ def make_poem_input_layer(
         [
             allele_vecs,
             length_encodings,
-            encoded_peptides,
+            tcr_encoded_peptides,
             log_mech_output[:, np.newaxis],
         ]
     )

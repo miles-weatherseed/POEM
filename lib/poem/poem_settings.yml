@@ -1,10 +1,10 @@
 # Which features to include in input
 dataset:
-  tcr: NetTepi                   # NetTepi, PRIME2.0 or None
-  length: true                   # Whether to include a sparse encoding of the peptide length
+  tcr_encoding: NetTepi          # TCR encoding strategy: NetTepi, PRIME2.0 or None
+  length_encoding: true          # Boolean: whether to include a sparse encoding of the peptide length
   mhci_sequence: pseudosequence  # Whether to use full sequence or pseudosequence, or None
   mhci_encoding: sparse          # How to encode the mhci_sequence, if at all
-  randoms: true                  # Whether to include random/decoys in training data
+  #randoms: true                 # Whether to include random/decoys in PRIME2.0 training data - maybe shouldn't be in YAML
   normalization: MinMax          # Whether and how to normalize input data (MinMax, Standard, None)
 
 # Model configuration
@@ -29,5 +29,5 @@ training:
 
 # Logging and saving configuration
 logging:
-  save_model: true               # Save the model after training
-  save_path: models/mlp_model.h5  # Path to save the trained model
+  save_model: true               # Save the model if training
+  save_path: models/mlp_model.h5  # Path to save/load the trained model
