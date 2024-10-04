@@ -16,7 +16,10 @@ model:
 
 # Training configuration
 training:
-  epochs: 200                     # Number of training epochs
+  kfolds: 10                    # how many folds to use for cross-validation
+  stratified: true              # whether to use stratified K-folds
+  random_seed: 42               # random seed to ensure reproducibility
+  epochs: 200                   # Number of training epochs
   batch_size: 1                 # Batch size for training
   learning_rate: 0.01           # Learning rate for the optimizer
   optimizer: sgd                # Optimizer type (e.g., adam, sgd)

@@ -6,22 +6,29 @@ from Bio.Align import substitution_matrices
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
+NETMHCPAN_PSEUDO_PATH = os.path.abspath(
+    os.path.join(
+        current_dir,
+        "..",
+        "..",
+        "mechanistic_model",
+        "data",
+        "netmhcpan_pseudo.dat",
+    )
+)
+NETMHCPAN_PSEUDOSEQUENCES = pd.read_csv(NETMHCPAN_PSEUDO_PATH, sep="\s+")
+PSEUDOSEQ_DICT = dict(
+    zip(
+        NETMHCPAN_PSEUDOSEQUENCES["allele"],
+        NETMHCPAN_PSEUDOSEQUENCES["pseudosequence"],
+    )
+)
+
 SUBS_MATRICES = substitution_matrices.load()
 VALID_ENCODINGS = [x.lower() for x in SUBS_MATRICES] + [
     "sparse",
 ]
-
-# load in log enrichment scores from NetTepi (Calis et el.)
-enrichment_data = pd.read_csv(
-    os.path.join(current_dir, "data", "NetTepi_Enrichments.csv")
-)
-AA_scores = dict(
-    zip(enrichment_data.AA.values, enrichment_data.log_enrichment_score.values)
-)
-AA_scores["X"] = 0
-
-# define AA order for PRIME2.0 encoding
-AAs = [
+AMINO_ACIDS = [
     "A",
     "C",
     "D",
@@ -42,8 +49,110 @@ AAs = [
     "V",
     "W",
     "Y",
-]
-aa_order = dict(zip(AAs, np.arange(20)))
+    "X",
+]  # canonical amino acids
+
+# load in log enrichment scores from NetTepi (Calis et el.)
+enrichment_data = pd.read_csv(
+    os.path.abspath(
+        os.path.join(current_dir, "..", "data", "NetTepi_Enrichments.csv")
+    )
+)
+CALIS_ENRICHMENT = dict(
+    zip(enrichment_data.AA.values, enrichment_data.log_enrichment_score.values)
+)
+CALIS_ENRICHMENT["X"] = 0
+AA_ORDER = dict(zip(AMINO_ACIDS, np.arange(21)))
+
+# create concatenation of alpha and beta mhc-i regions if first time running
+if not os.path.exists(
+    os.path.abspath(
+        os.path.join(current_dir, "..", "data", "mhci_full_sequences.csv")
+    )
+):
+    alphas = pd.read_csv(
+        os.path.abspath(
+            os.path.join(current_dir, "..", "data", "mhci_g_alpha.tsv")
+        ),
+        sep="\t",
+    )
+    betas = pd.read_csv(
+        os.path.abspath(
+            os.path.join(current_dir, "..", "data", "mhci_g_alpha.tsv")
+        ),
+        sep="\t",
+    )
+    # Merge alpha and beta on 'mhc_allele'
+    mhci_full_sequences = pd.merge(
+        alphas, betas, on="mhc_allele", suffixes=("_alpha", "_beta")
+    )
+
+    # Concatenate the sequences from alpha and beta
+    mhci_full_sequences["concatenated_sequence"] = (
+        mhci_full_sequences["sequence_alpha"]
+        + mhci_full_sequences["sequence_beta"]
+    )
+    # drop "-" from MSA
+    mhci_full_sequences["concatenated_sequence"] = mhci_full_sequences[
+        "concatenated_sequence"
+    ].str.replace("-", "", regex=False)
+    mhci_full_sequences.to_csv(
+        os.path.abspath(
+            os.path.join(current_dir, "..", "data", "mhci_full_sequences.csv")
+        ),
+        index=False,
+    )
+else:
+    mhci_full_sequences = pd.read_csv(
+        os.path.abspath(
+            os.path.join(current_dir, "..", "data", "mhci_full_sequences.csv")
+        )
+    )
+
+MHCI_SEQ_DICT = dict(
+    zip(
+        mhci_full_sequences["mhc_allele"],
+        mhci_full_sequences["concatenated_sequence"],
+    )
+)
+
+
+def sparse_aa_encoding(peptides: list) -> np.ndarray:
+    """_summary_
+    Takes a peptide list input and returns a sparse representation of the peptides.
+    Args:
+        peptide (list): Peptides to be encoded
+    """
+    lengths = set([len(x) for x in peptides])
+    assert len(lengths) == 1  # can't handle mixed lengths
+    output = np.zeros((len(peptides), 21 * len(peptides[0])))
+    for i in range(len(peptides)):
+        for idx, s in enumerate(peptides[i]):
+            output[i, idx * 21 + AMINO_ACIDS.index(s)] += 1
+    return np.array(output)
+
+
+def submatrix_aa_encoding(peptides: list, matrix: str) -> np.ndarray:
+    """_summary_
+    Converts a list of peptides to substitution matrix encodings.
+    Args:
+        peptide (list): List of peptides to be encoded
+        matrix (str): The substitution matrix name to use (e.g. "BLOSUM62")
+    """
+    assert matrix.upper() in SUBS_MATRICES
+    M = substitution_matrices.load(name=matrix.upper())
+
+    # some of the substitution matrices in the Biopython package don't have the X amino acid
+    # TODO: decide on better way to handle these. Replace with alanine for now.
+
+    if ("X", "X") not in M.keys():
+        for i in range(len(peptides)):
+            peptides[i] = peptides[i].replace(
+                "X", "A"
+            )  # switch to alanine padding for now
+    return np.array(
+        [np.array([M[x].values() for x in p]).flatten() for p in peptides]
+    )
 
 
 def encode_nettepi_tcr_residues(peplist: np.ndarray) -> np.ndarray:
@@ -61,7 +170,7 @@ def encode_nettepi_tcr_residues(peplist: np.ndarray) -> np.ndarray:
         immuscore = np.zeros(6)
         if len(peptide) == 9:
             for i in range(3, 9):
-                immuscore[i - 3] = AA_scores[peptide[i - 1]]
+                immuscore[i - 3] = CALIS_ENRICHMENT[peptide[i - 1]]
             pred[n, :] = immuscore
         else:
             list_9mers = convert_to_9mers(peptide)
@@ -69,7 +178,7 @@ def encode_nettepi_tcr_residues(peplist: np.ndarray) -> np.ndarray:
             for p in list_9mers:
                 p_scores = np.zeros(6)
                 for i in range(3, 9):
-                    p_scores[i - 3] = AA_scores[p[i - 1]]
+                    p_scores[i - 3] = CALIS_ENRICHMENT[p[i - 1]]
                 score_sums += p_scores
             immuscore = score_sums / len(list_9mers)
             pred[n, :] = immuscore
@@ -214,8 +323,62 @@ def encode_prime2_tcr_residues(
     positions, npos = get_mia_positions(allele, plen)
     tcr_enc = np.zeros(20)
     for p in positions:
-        tcr_enc[aa_order[peptide[p]]] += 1
+        tcr_enc[AA_ORDER[peptide[p]]] += 1
     return tcr_enc / npos
+
+
+def mhci_alleles_to_pseudovec(alleles: np.ndarray, enc: str) -> np.ndarray:
+    """Looks up NetMHCpan-4.1 pseudosequence and encodes numerically.
+
+    Args:
+        alleles (np.ndarray): Array of allele names
+        enc (str): The desired encoding strategy (sparse or substitution
+        matrix)
+
+    Returns:
+        np.ndarray: 2D array of encoded pseudosequences
+    """
+    pseudoseqs = []
+    for a in alleles:
+        parsed_allele = mhcgnomes.parse(a)
+        # sometimes the compact names parse to serotypes, e.g. B3901. I am unsure why.
+        if type(parsed_allele) is mhcgnomes.serotype.Serotype:
+            parsed_allele = parsed_allele.alleles[0].to_string()
+        else:
+            parsed_allele = parsed_allele.to_string()
+        pseudoseqs.append(PSEUDOSEQ_DICT[parsed_allele])
+
+    if enc == "sparse":
+        return sparse_aa_encoding(pseudoseqs)
+    else:
+        return submatrix_aa_encoding(pseudoseqs, enc.upper())
+
+
+def mhci_alleles_to_whole(alleles: np.ndarray, enc: str) -> np.ndarray:
+    """Looks up MHC-I alpha and beta sequence and encodes numerically.
+
+    Args:
+        alleles (np.ndarray): Array of allele names
+        enc (str): The desired encoding strategy (sparse or substitution
+        matrix)
+
+    Returns:
+        np.ndarray: 2D array of encoded alpha and beta sequences
+    """
+    pseudoseqs = []
+    for a in alleles:
+        parsed_allele = mhcgnomes.parse(a)
+        # sometimes the compact names parse to serotypes, e.g. B3901. I am unsure why.
+        if type(parsed_allele) is mhcgnomes.serotype.Serotype:
+            parsed_allele = parsed_allele.alleles[0].to_string()
+        else:
+            parsed_allele = parsed_allele.to_string()
+        pseudoseqs.append(MHCI_SEQ_DICT[parsed_allele])
+
+    if enc == "sparse":
+        return sparse_aa_encoding(pseudoseqs)
+    else:
+        return submatrix_aa_encoding(pseudoseqs, enc.upper())
 
 
 def make_poem_input_layer(
@@ -250,19 +413,9 @@ def make_poem_input_layer(
 
     # Encode MHC-I alleles
     if mhci_rep == "pseudosequence":
-        allele_vecs = np.vstack(
-            [
-                mhci_allele_to_pseudovec(allele, enc=mhci_encoding)
-                for allele in alleles
-            ]
-        )
+        allele_vecs = mhci_alleles_to_pseudovec(alleles, enc=mhci_encoding)
     elif mhci_rep == "full":
-        allele_vecs = np.vstack(
-            [
-                mhci_allele_to_whole_vec(allele, enc=mhci_encoding)
-                for allele in alleles
-            ]
-        )
+        allele_vecs = mhci_alleles_to_whole(alleles, enc=mhci_encoding)
     elif mhci_rep == "none":
         allele_vecs = np.zeros((len(alleles), 0))
 

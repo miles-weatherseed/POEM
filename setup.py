@@ -17,7 +17,8 @@ setup(
     package_dir={"": "lib"},  # Point to the directory containing your modules
     include_package_data=True,
     package_data={
-        "mechanistic_model": ["utils/*.json", "data/*.csv", "data/*.dat"]
+        "mechanistic_model": ["utils/*.json", "data/*.csv", "data/*.dat"],
+        "poem": ["data/*.csv"],
     },  # Include JSON files
     install_requires=read_requirements(),
     entry_points={
