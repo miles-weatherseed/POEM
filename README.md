@@ -27,8 +27,7 @@ Other columns are permitted but may be overwritten by `length`, `start`, or `pre
 The mechanistic model can then be simulated by running 
 
 ```bash
-usage: classi_presentation  [-h] [-p INPUT_PEPTIDES] 
-[-d FASTA_DIR] [-c] [-o] [-v]
+usage: classi_presentation  [-h] [-p INPUT_PEPTIDES] [-d FASTA_DIR] [-c] [-o] [-v]
 
 Required arguments:
   -p INPUT_PEPTIDES, --input_peptides INPUT_PEPTIDES
