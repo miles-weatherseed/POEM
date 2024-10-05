@@ -8,6 +8,7 @@ import tempfile
 import shutil
 import yaml
 import subprocess
+from tqdm import tqdm
 from Bio import SeqIO
 from mechanistic_model.affinities import get_netmhc, get_netmhcpan
 from mechanistic_model.erap1 import get_erap1_kcats
@@ -32,6 +33,11 @@ configuration = yaml.safe_load(
 # Custom type function to enforce case-insensitive comparison
 def capitalise_mode(value):
     return value.capitalize()
+
+
+# Helper function to optionally apply tqdm
+def verbose_tqdm(iterator, verbosity, desc=""):
+    return tqdm(iterator, desc=desc) if verbosity else iterator
 
 
 def main():
@@ -77,6 +83,15 @@ def main():
         type=capitalise_mode,
     )
 
+    # Adding -v for verbosity
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="Whether or not to log progress messages.",
+        action="store_true",
+        default=False,
+    )
+
     # Parse the arguments
     args = parser.parse_args()
 
@@ -120,7 +135,11 @@ def main():
     # TODO: decide whether to hold this in memory or in tempfiles
     pepsickle_dictionary = {}
     pepsickle_version = configuration["pepsickle_version"]
-    for f in fasta_names:
+    for f in verbose_tqdm(
+        fasta_names,
+        args.verbosity,
+        desc="Running Pepsickle for provided fastas",
+    ):
         pepsickle_dictionary[f] = run_algos(
             os.path.join(args.fasta_dir, f"{f}.fasta"),
             pepsickle_version,
@@ -143,7 +162,11 @@ def main():
     # calculate peptide-specific parameters
     # 1. Proteasomal digestion
     gPs = np.zeros(peptides_list.shape)
-    for i in range(gPs.shape[0]):
+    for i in verbose_tqdm(
+        range(gPs.shape[0]),
+        args.verbosity,
+        desc="Calculating proteasomal product probabilities",
+    ):
         startpoints = np.array(
             [
                 peptides_df["start"].values[i]
@@ -179,13 +202,24 @@ def main():
     TAP_BAs = np.array(
         [
             predict_tap_binding_affinities(p, args.host_organism)
-            for p in peptides_list
+            for p in verbose_tqdm(
+                peptides_list,
+                args.verbosity,
+                desc="Predicting TAP binding affinities",
+            )
         ]
     )
     np.save(os.path.join(temp_dir, "TAP_BAs.npy"), TAP_BAs)
 
     # 4. ERAP1 kcats
-    erap1_kcats = np.array([get_erap1_kcats(p) for p in peptides_list])
+    erap1_kcats = np.array(
+        [
+            get_erap1_kcats(p)
+            for p in verbose_tqdm(
+                peptides_list, args.verbosity, desc="Predicting ERAP1 kcats"
+            )
+        ]
+    )
     np.save(os.path.join(temp_dir, "erap1_kcat_out.npy"), erap1_kcats)
     np.save(
         os.path.join(temp_dir, "erap1_kcat_in.npy"),
@@ -197,7 +231,11 @@ def main():
     binding_rates = np.zeros(peptides_list.shape[0])
     affinity_algorithm = configuration["mhci_affinity_algorithm"]
     # batch by MHC-I allele and peptide length
-    for allele in peptides_df["mhc_i"].unique():
+    for allele in verbose_tqdm(
+        peptides_df["mhc_i"].unique(),
+        args.verbosity,
+        desc="Predicting peptide-MHC binding affinities, looping over unique MHC-I alleles",
+    ):
         # work out the binding rate using tapasin dependence for this allele
         allele_mask = peptides_df["mhc_i"].values == allele
         binding_rates[allele_mask] = get_allele_bER(allele)
@@ -220,6 +258,8 @@ def main():
     np.save(os.path.join(temp_dir, "mhci_affinities.npy"), mhci_affinities)
 
     # run mechanistic model in Julia
+    if args.verbosity is True:
+        print("Running mechanistic model in Julia")
     subprocess.run(
         ["julia", os.path.join(current_dir, "mechanistic_model.jl"), temp_dir],
         stdout=sys.stdout,
@@ -234,6 +274,8 @@ def main():
     ]
 
     # save the peptides_df as results
+    if args.verbosity is True:
+        print("Saving results to poem_mechanistic_results.csv")
     peptides_df.to_csv(
         os.path.join(
             os.path.dirname(args.input_peptides),

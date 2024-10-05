@@ -98,42 +98,15 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
         config["dataset"]["tcr_encoding"],
     )
     np.save("poem_input.npy", poem_input)
-    poem_input = StandardScaler().fit_transform(poem_input)
 
     poem_target = training_data["immunogenicity"]
 
-    # create a pipeline to hold the scaler and the regressor
-    mlp_classifier = KerasClassifier(
-        model=create_mlp,
-        epochs=config["training"]["epochs"],
-        batch_size=config["training"]["batch_size"],
-        verbose=0,
-        config=config,
-        input_dim=poem_input.shape[1],
-    )
     if config["dataset"]["normalization"] == "minmax":
-        pipeline = Pipeline(
-            [
-                ("scaler", MinMaxScaler()),
-                ("mlp", mlp_classifier),
-            ]
-        )
+        scaler = MinMaxScaler()
     elif config["dataset"]["normalization"] == "standard":
-        pipeline = Pipeline(
-            [
-                (
-                    "scaler",
-                    StandardScaler(),
-                ),
-                ("mlp", mlp_classifier),
-            ]
-        )
+        scaler = StandardScaler()
     else:  # no scaling
-        pipeline = Pipeline(
-            [
-                ("mlp", mlp_classifier),
-            ]
-        )
+        scaler = None
 
     # create K folds
     if config["training"]["stratified"]:
@@ -153,6 +126,7 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
     for i, (train_index, test_index) in enumerate(kf):
         X_train = poem_input[train_index]
         y_train = poem_target[train_index]
+
         if config["training"]["early_stopping"]["enabled"]:
             X_train_t, X_train_v, y_train_t, y_train_v = train_test_split(
                 X_train,
@@ -161,31 +135,41 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
                 shuffle=True,
                 random_state=config["training"]["random_seed"],
             )
-            fit_params = {
-                "mlp__validation_data": (X_train_v, y_train_v),
-                "mlp__callbacks": [
-                    EarlyStopping(
-                        monitor="val_loss",
-                        patience=config["training"]["early_stopping"][
-                            "patience"
-                        ],
-                        restore_best_weights=config["training"][
-                            "early_stopping"
-                        ]["restore_best_weights"],
-                    )
+            if scaler is not None:
+                X_train_t = scaler.fit_transform(X_train_t)
+                X_train_v = scaler.transform(X_train_v)
+
+            model = create_mlp(config, X_train.shape[1])
+            early_stopping = EarlyStopping(
+                monitor="val_loss",
+                patience=config["training"]["early_stopping"]["patience"],
+                restore_best_weights=config["training"]["early_stopping"][
+                    "restore_best_weights"
                 ],
-            }
-            pipeline.fit(X_train_t, y_train_t, **fit_params)
+            )
+            model.fit(
+                X_train_t,
+                y_train_t,
+                validation_data=(X_train_v, y_train_v),
+                epochs=config["training"]["epochs"],
+                callbacks=[early_stopping],
+                verbose=0,
+            )
         else:
-            pipeline.fit(
+            model = create_mlp(config, X_train.shape[1])
+            if scaler is not None:
+                X_train = scaler.fit_transform(X_train)
+            model.fit(
                 X_train,
                 y_train,
                 epochs=config["training"]["epochs"],
                 verbose=0,
             )
-        test_scores = pipeline.predict_proba(
-            poem_input[test_index], verbose=0
-        )[:, 1]
+        if scaler is not None:
+            X_test = scaler.fit_transform(poem_input[test_index])
+        else:
+            X_test = poem_input[test_index]
+        test_scores = model.predict(X_test, verbose=0)
         print(
             f"Fold {i} AUROC:",
             roc_auc_score(poem_target[test_index], test_scores),
@@ -202,27 +186,44 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
             shuffle=True,
             random_state=config["training"]["random_seed"],
         )
-        fit_params = {
-            "mlp__validation_data": (X_train_v, y_train_v),
-            "mlp__callbacks": [
-                EarlyStopping(
-                    monitor="val_loss",
-                    patience=config["training"]["early_stopping"]["patience"],
-                    restore_best_weights=config["training"]["early_stopping"][
-                        "restore_best_weights"
-                    ],
-                )
+        if scaler is not None:
+            X_train_t = scaler.fit_transform(X_train_t)
+            X_train_v = scaler.transform(X_train_v)
+        model = create_mlp(config, X_train.shape[1])
+        early_stopping = EarlyStopping(
+            monitor="val_loss",
+            patience=config["training"]["early_stopping"]["patience"],
+            restore_best_weights=config["training"]["early_stopping"][
+                "restore_best_weights"
             ],
-        }
-
-        pipeline.fit(X_train_t, y_train_t, **fit_params)
+        )
+        model.fit(
+            X_train_t,
+            y_train_t,
+            validation_data=(X_train_v, y_train_v),
+            epochs=config["training"]["epochs"],
+            callbacks=[early_stopping],
+            verbose=0,
+        )
     else:
-        pipeline.fit(
+        model = create_mlp(config, X_train.shape[1])
+        if scaler is not None:
+            X_train = scaler.fit_transform(X_train)
+        model.fit(
             X_train,
             y_train,
+            epochs=config["training"]["epochs"],
+            verbose=0,
         )
     if config["logging"]["save_model"]:
-        joblib.dump(pipeline, config["logging"]["save_path"])
+        model.save(config["logging"]["save_path"])
+        # should also save associated scaler
+        if scaler is not None:
+            joblib.dump(
+                scaler,
+                "".join(config["logging"]["save_path"].split(".")[:-1])
+                + "_scaler.pkl",
+            )
     return
 
 

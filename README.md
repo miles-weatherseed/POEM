@@ -12,6 +12,38 @@ The source code is split into two sections:
 2) **POEM** - this is a binary classifier trained using the PRIME2.0 dataset (Gfeller *et al*, 2021) to predict CD8+ immunogenicity. As input features, the predictor uses the ouput of the mechanistic model, along with MHC-I pseudosequence, peptide length, and predicted peptide TCR-interaction properties.
 
 
+## Quickstart
+
+**NOTE:** *The instructions in this section will not work until the user has followed the installation instructions below.*
+
+To run the mechanistic model, the user needs to have a `.csv` file with the columns:
+
+- `peptide`: containing the peptide sequences to be queried
+- `mhc_i`: the name of the binding MHC-I allele
+- `fasta`: the filename of the `.fasta` file containing the primary sequence of the corresponding MHC-I allele.
+
+Other columns are permitted but may be overwritten by `length`, `start`, or `predicted_pmhc`. The users should create a directory containing the necessary `.fasta` files.
+
+The mechanistic model can then be simulated by running 
+
+```bash
+usage: classi_presentation  [-h] [-p INPUT_PEPTIDES] 
+[-d FASTA_DIR] [-c] [-o] [-v]
+
+Required arguments:
+  -p INPUT_PEPTIDES, --input_peptides INPUT_PEPTIDES
+                        Path to the input peptides CSV file.
+  -d FASTA_DIR, --fasta_dir FASTA_DIR
+                        Path to the directory containing FASTA files.
+
+Optional arguments:
+  -h, --help            show this help message and exit
+  -c, --clean_up        Whether or not to clean up the files after completion. Default=False.
+  -o {Human,Mouse,Rat_a,Rat_u}, --host_organism {Human,Mouse,Rat_a,Rat_u}
+                        Which animal to run the TAP model for. Default=Human.
+  -v, --verbose         Whether or not to log progress messages. Default=False.
+```
+
 ## Installation
 
 POEM is written primarily in Python and should be compatible with Python>=3.7. To avoid conflicts in dependencies, it is recommended that users create a new virtual environment for POEM:

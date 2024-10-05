@@ -5,7 +5,7 @@ dataset:
   mhci_sequence: pseudosequence  # Whether to use full sequence or pseudosequence, or None
   mhci_encoding: sparse          # How to encode the mhci_sequence, if at all
   #randoms: true                 # Whether to include random/decoys in PRIME2.0 training data - maybe shouldn't be in YAML
-  normalization: None          # Whether and how to normalize input data (MinMax, Standard, None)
+  normalization: Standard          # Whether and how to normalize input data (MinMax, Standard, None)
 
 # Model configuration
 model:
@@ -33,4 +33,4 @@ training:
 # Logging and saving configuration
 logging:
   save_model: true               # Save the model if training
-  save_path: models/mlp_model.h5  # Path to save/load the trained model
+  save_path: trained_models/mlp_model.h5  # Path to save/load the trained model
