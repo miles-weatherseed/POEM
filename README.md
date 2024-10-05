@@ -24,7 +24,7 @@ To run the mechanistic model, the user needs to have a `.csv` file with the colu
 
 Other columns are permitted but may be overwritten by `length`, `start`, or `predicted_pmhc`. The users should create a directory containing the necessary `.fasta` files.
 
-The mechanistic model can then be simulated by running 
+The mechanistic model can then be simulated by running:
 
 ```bash
 usage: classi_presentation  [-h] [-p INPUT_PEPTIDES] [-d FASTA_DIR] [-c] [-o] [-v]
@@ -36,12 +36,32 @@ Required arguments:
                         Path to the directory containing FASTA files.
 
 Optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help            show help message
   -c, --clean_up        Whether or not to clean up the files after completion. Default=False.
   -o {Human,Mouse,Rat_a,Rat_u}, --host_organism {Human,Mouse,Rat_a,Rat_u}
                         Which animal to run the TAP model for. Default=Human.
   -v, --verbose         Whether or not to log progress messages. Default=False.
 ```
+
+This produces a file `poem_mechanistic_results.csv`, which is a copy of the input `.csv` with the added columns: `length`, `start`, and `predicted_pmhc`. 
+
+The output `.csv` can then be used to train a new immunogenicity predictor or predict CD8+ immunogenicity using an existing predictor by calling `poem` from the command line. The user-defined settings are passed in the form of a YAML file. This must be of the same format as `lib/poem/poem_settings.yml`. The predictor can then be run using:
+
+```bash
+usage: poem [-h] [-d INPUT_DATA] [-m {train,test}] [-c CONFIG_PATH]
+
+Required arguments:
+  -d INPUT_DATA, --input_data INPUT_DATA
+                        Path to the input data CSV file.
+  -m {train,test}, --mode {train,test}
+                        Whether to train a new model or test one.
+  -c CONFIG_PATH, --config_path CONFIG_PATH
+                        Path to config file.
+
+Optional arguments:
+  -h, --help            show this help message and exit
+```
+The predictions in `test` mode are written to a new file with the same name as the `INPUT_DATA` and the suffix `_poem_preds.csv`.
 
 ## Installation
 
