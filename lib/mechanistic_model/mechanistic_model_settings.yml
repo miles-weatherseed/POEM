@@ -24,11 +24,11 @@ hearn_fitted_parameters:
   k_TAP : 5.00
   T0 : 10000
   d_cyt : 0.001572031
-  V_ER : 270990.0
-  V_TAP : 566068.0
+  V_ER : 270990.0 # this converts units of uM to raw numbers of molecules
+  V_TAP : 566.068 # this converts units of nM to raw numbers of molecules
   g_self_cyt: 2000000
 
 configuration:
   max_length : 16
   pepsickle_version: 0
-  mhci_affinity_algorithm: "NetMHC"
+  mhci_affinity_algorithm: "NetMHCpan"

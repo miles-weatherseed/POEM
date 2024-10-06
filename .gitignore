@@ -1,5 +1,7 @@
 # user specified gitignores
 trained_models
+data/prime2_fastas/*
+local/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

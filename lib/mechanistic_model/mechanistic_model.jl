@@ -10,7 +10,7 @@ input_dir = ARGS[1]
 current_dir = @__DIR__
 
 # Load the configuration from YAML file
-config = YAML.load_file(joinpath(current_dir, "data", "mechanistic_model_settings.yml"))
+config = YAML.load_file(joinpath(current_dir, "mechanistic_model_settings.yml"))
 
 ed_config = config["ed_parameters"]
 ed_order = [

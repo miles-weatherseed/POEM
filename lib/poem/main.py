@@ -97,7 +97,6 @@ def train_poem(training_data: pd.DataFrame, config: Dict[str, Any]):
         config["dataset"]["mhci_sequence"],
         config["dataset"]["tcr_encoding"],
     )
-    np.save("poem_input.npy", poem_input)
 
     poem_target = training_data["immunogenicity"]
 

@@ -24,7 +24,7 @@ from mechanistic_model.utils.utils import find_peptide_precursors
 current_dir = os.path.dirname(os.path.abspath(__file__))
 configuration = yaml.safe_load(
     open(
-        os.path.join(current_dir, "data", "mechanistic_model_settings.yml"),
+        os.path.join(current_dir, "mechanistic_model_settings.yml"),
         "r",
     )
 )["configuration"]
@@ -86,7 +86,7 @@ def main():
     # Adding -v for verbosity
     parser.add_argument(
         "-v",
-        "--verbose",
+        "--verbosity",
         help="Whether or not to log progress messages.",
         action="store_true",
         default=False,
@@ -129,10 +129,11 @@ def main():
         )
 
     # make a temporary directory in which to save newly generated files
-    temp_dir = tempfile.mkdtemp(dir=args.fasta_dir)
+    temp_dir = "data/prime2_fastas/tmptxxfbel9"  # tempfile.mkdtemp(dir=args.fasta_dir)
 
     # run pepsickle algorithm on FASTAs
     # TODO: decide whether to hold this in memory or in tempfiles
+    """
     pepsickle_dictionary = {}
     pepsickle_version = configuration["pepsickle_version"]
     for f in verbose_tqdm(
@@ -145,7 +146,8 @@ def main():
             pepsickle_version,
             "I",
         )
-
+    
+    """
     # find peptide precursors/products
     peptides_list = []
     peptide_lengths = np.arange(8, configuration["max_length"] + 1)[::-1]
@@ -158,7 +160,7 @@ def main():
         )
         peptides_list.append(peps)
     peptides_list = np.array(peptides_list)
-
+    """
     # calculate peptide-specific parameters
     # 1. Proteasomal digestion
     gPs = np.zeros(peptides_list.shape)
@@ -186,6 +188,7 @@ def main():
         gPs[i, :] = np.hstack(
             [np.zeros(np.sum([startpoints < 0])), predicted_gPs]
         )
+    
     np.save(os.path.join(temp_dir, "gPs.npy"), gPs)
 
     # 2. Cytosolic aminopeptidase parameters
@@ -225,7 +228,14 @@ def main():
         os.path.join(temp_dir, "erap1_kcat_in.npy"),
         np.hstack([np.zeros((erap1_kcats.shape[0], 1)), erap1_kcats[:, :-1]]),
     )
-
+    """
+    peptides_list = np.array(
+        [
+            [peptide.replace("X", "A") for peptide in sublist]
+            for sublist in peptides_list
+        ]
+    )
+    """
     # 5. MHC-I binding affinity prediction and
     mhci_affinities = np.zeros(peptides_list.shape)
     binding_rates = np.zeros(peptides_list.shape[0])
@@ -256,6 +266,7 @@ def main():
                 )
     np.save(os.path.join(temp_dir, "bERs.npy"), binding_rates)
     np.save(os.path.join(temp_dir, "mhci_affinities.npy"), mhci_affinities)
+    """
 
     # run mechanistic model in Julia
     if args.verbosity is True:
