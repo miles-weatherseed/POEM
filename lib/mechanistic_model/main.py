@@ -24,7 +24,7 @@ from mechanistic_model.utils.utils import find_peptide_precursors
 current_dir = os.path.dirname(os.path.abspath(__file__))
 configuration = yaml.safe_load(
     open(
-        os.path.join(current_dir, "data", "mechanistic_model_settings.yml"),
+        os.path.join(current_dir, "mechanistic_model_settings.yml"),
         "r",
     )
 )["configuration"]
@@ -90,6 +90,15 @@ def main():
         help="Whether or not to log progress messages.",
         action="store_true",
         default=False,
+    )
+
+    # Giving user the option to provide their own YAML - enables changing of parameter values
+    parser.add_argument(
+        "-y",
+        "--yaml",
+        help="User provided non-default YAML",
+        default=os.path.join(current_dir, "mechanistic_model_settings.yml"),
+        required=False,
     )
 
     # Parse the arguments
@@ -227,10 +236,12 @@ def main():
     )
 
     # 5. MHC-I binding affinity prediction and tapasin dependence prediction
-    peptides_list = [
-        [peptide.replace("X", "A") for peptide in sublist]
-        for sublist in peptides_list
-    ]  # MHC-I algos can't handle X so replace with alanine
+    peptides_list = np.array(
+        [
+            [peptide.replace("X", "A") for peptide in sublist]
+            for sublist in peptides_list
+        ]
+    )  # MHC-I algos can't handle X so replace with alanine
     mhci_affinities = np.zeros(peptides_list.shape)
     binding_rates = np.zeros(peptides_list.shape[0])
     affinity_algorithm = configuration["mhci_affinity_algorithm"]
@@ -265,7 +276,12 @@ def main():
     if args.verbosity is True:
         print("Running mechanistic model in Julia")
     subprocess.run(
-        ["julia", os.path.join(current_dir, "mechanistic_model.jl"), temp_dir],
+        [
+            "julia",
+            os.path.join(current_dir, "mechanistic_model.jl"),
+            temp_dir,
+            args.yaml,
+        ],
         stdout=sys.stdout,
         stderr=sys.stderr,
     )
@@ -281,10 +297,7 @@ def main():
     if args.verbosity is True:
         print("Saving results to poem_mechanistic_results.csv")
     peptides_df.to_csv(
-        os.path.join(
-            os.path.dirname(args.input_peptides),
-            "poem_mechanistic_results.csv",
-        ),
+        os.path.join(args.input_peptides[:-4] + "_poem_mech.csv"),
         index=False,
     )
     # clean up

@@ -88,7 +88,9 @@ profile_default/
 ipython_config.py
 
 # Trained models
-lib/mechanistic_model/cache/*
+lib/mechanistic_model/cache/erap1_models/*
+lib/mechanistic_model/cache/tap_models/*
+lib/mechanistic_model/cache/tapasin_dependence/*
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is

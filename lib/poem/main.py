@@ -9,7 +9,7 @@ import tensorflow as tf
 import joblib
 from tensorflow.keras.callbacks import EarlyStopping
 from scikeras.wrappers import KerasClassifier
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.optimizers import SGD, Adam
 from poem.utils.utils import make_poem_input_layer, VALID_ENCODINGS
@@ -17,6 +17,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score, accuracy_score
+
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -248,9 +249,28 @@ def test_poem(test_data: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
     )
 
     # load model
-    pipeline = joblib.load(config["logging"]["save_path"])
+    pipeline = load_model(
+        os.path.abspath(
+            os.path.join(
+                current_dir, "..", "..", config["logging"]["save_path"]
+            )
+        )
+    )
+    scaler = joblib.load(
+        os.path.abspath(
+            os.path.join(
+                current_dir,
+                "..",
+                "..",
+                "".join(config["logging"]["save_path"].split(".")[:-1])
+                + "_scaler.pkl",
+            )
+        )
+    )
 
-    test_data["poem_prediction"] = pipeline.predict_proba(poem_input)[:, 1]
+    poem_input = scaler.transform(poem_input)
+
+    test_data["poem_prediction"] = pipeline.predict(poem_input)
     return test_data
 
 
