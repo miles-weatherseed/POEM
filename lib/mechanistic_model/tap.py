@@ -162,6 +162,6 @@ if __name__ == "__main__":
     print(
         predict_tap_binding_affinities(
             np.array(["QLESIINFEKL", "FSIINFEKL"]),
-            np.array(["Human", "Mouse"]),
+            "Human",
         )
     )
