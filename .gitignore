@@ -1,7 +1,9 @@
 # user specified gitignores
-trained_models
+#trained_models
 data/prime2_fastas/*
 local/
+test/mechanistic_model/fastas/*/*
+test/mechanistic_model/mechanistic_test_poem_mech.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
