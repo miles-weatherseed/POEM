@@ -24,7 +24,8 @@ setup(
     entry_points={
         "console_scripts": [
             "poem=poem.main:main",
-            "classi_presentation=mechanistic_model.main:main",
+            "classi_presentation_SA=mechanistic_model.main:SA",
+            "classi_presentation_MA=mechanistic_model.main:MA",
         ],
     },
 )

@@ -8,6 +8,7 @@ import tempfile
 import shutil
 import yaml
 import subprocess
+import pickle
 from tqdm import tqdm
 from Bio import SeqIO
 from mechanistic_model.affinities import get_netmhc, get_netmhcpan
@@ -40,7 +41,7 @@ def verbose_tqdm(iterator, verbosity, desc=""):
     return tqdm(iterator, desc=desc) if verbosity else iterator
 
 
-def main():
+def SA():
     parser = argparse.ArgumentParser(
         description="Process input_peptides and fasta_dir."
     )
@@ -61,6 +62,16 @@ def main():
         help="Path to the directory containing FASTA files.",
         type=str,
         required=True,
+    )
+
+    # Adding -t for cache directory name
+    parser.add_argument(
+        "-t",
+        "--cache_name",
+        help="Name of directory in which to store the intermediate files.",
+        type=str,
+        default="cache",
+        required=False,
     )
 
     # Adding -c for clean_up
@@ -138,7 +149,8 @@ def main():
         )
 
     # make a temporary directory in which to save newly generated files
-    temp_dir = tempfile.mkdtemp(dir=args.fasta_dir)
+    temp_dir = os.path.join(args.fasta_dir, args.cache_name)
+    os.mkdir(temp_dir)
 
     # run pepsickle algorithm on FASTAs
     # TODO: decide whether to hold this in memory or in tempfiles
@@ -167,6 +179,9 @@ def main():
         )
         peptides_list.append(peps)
     peptides_list = np.array(peptides_list)
+    pickle.dump(
+        peptides_list, open(os.path.join(temp_dir, "peptide_list.pkl"), "wb")
+    )
 
     # calculate peptide-specific parameters
     # 1. Proteasomal digestion
@@ -292,6 +307,334 @@ def main():
         np.arange(len(peptides_df)),
         configuration["max_length"] - peptides_df["length"].values,
     ]
+
+    # save the peptides_df as results
+    if args.verbosity is True:
+        print("Saving results to poem_mechanistic_results.csv")
+    peptides_df.to_csv(
+        os.path.join(args.input_peptides[:-4] + "_poem_mech.csv"),
+        index=False,
+    )
+    # clean up
+    if args.clean_up:
+        shutil.rmtree(temp_dir)
+
+
+def MA():
+    parser = argparse.ArgumentParser(
+        description="Process input_peptides and fasta_dir."
+    )
+
+    # Adding -p for input_peptides (CSV file)
+    parser.add_argument(
+        "-p",
+        "--input_peptides",
+        help="Path to the input peptides CSV file.",
+        type=str,
+        required=True,
+    )
+
+    # Adding -d for fasta_dir (directory containing FASTA files)
+    parser.add_argument(
+        "-d",
+        "--fasta_dir",
+        help="Path to the directory containing FASTA files.",
+        type=str,
+        required=True,
+    )
+
+    # Adding -t for cache directory name
+    parser.add_argument(
+        "-t",
+        "--cache_name",
+        help="Name of directory in which to store the intermediate files.",
+        type=str,
+        default="cache",
+        required=False,
+    )
+
+    # Adding -c for clean_up
+    parser.add_argument(
+        "-c",
+        "--clean_up",
+        help="Whether or not to clean up the files after completion.",
+        action="store_true",
+        default=False,
+    )
+
+    # Adding -o for host organism
+    parser.add_argument(
+        "-o",
+        "--host_organism",
+        help="Which animal to run the TAP model for.",
+        default="Human",
+        required=False,
+        choices=["Human", "Mouse", "Rat_a", "Rat_u"],
+        type=capitalise_mode,
+    )
+
+    # Adding -v for verbosity
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        help="Whether or not to log progress messages.",
+        action="store_true",
+        default=False,
+    )
+
+    # Giving user the option to provide their own YAML - enables changing of parameter values
+    parser.add_argument(
+        "-y",
+        "--yaml",
+        help="User provided non-default YAML",
+        default=os.path.join(current_dir, "mechanistic_model_settings_MA.yml"),
+        required=False,
+    )
+
+    # scaling factors which we may pass to include AP scaling
+    parser.add_argument(
+        "-cr",
+        "--cyt_amin_ratio",
+        help="Cytosolic aminopeptidase ratio",
+        default=1,
+        type=float,
+        required=False,
+    )
+
+    parser.add_argument(
+        "-pr",
+        "--proteasome_ratio",
+        help="Proteasome ratio",
+        default=1,
+        type=float,
+        required=False,
+    )
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # open input file
+    peptides_df = pd.read_csv(args.input_peptides)
+
+    # ensure that the required columns are present
+    assert all(
+        col in peptides_df.columns
+        for col in [
+            "peptide",
+            "hla_A1",
+            "hla_A2",
+            "hla_B1",
+            "hla_B2",
+            "hla_C1",
+            "hla_C2",
+            "fasta",
+        ]
+    ), "DataFrame is missing required columns"
+
+    # add in lengths of peptides if not already present
+    peptides_df["length"] = [len(p) for p in peptides_df.peptide]
+
+    # ensure that all MHC-I allele names are consistent with mhcgnomes
+    # nomenclature
+    peptides_df["hla_A1"] = parse_allele_names(peptides_df["hla_A1"].values)
+    peptides_df["hla_A2"] = parse_allele_names(peptides_df["hla_A2"].values)
+    peptides_df["hla_B1"] = parse_allele_names(peptides_df["hla_B1"].values)
+    peptides_df["hla_B2"] = parse_allele_names(peptides_df["hla_B2"].values)
+    peptides_df["hla_C1"] = parse_allele_names(peptides_df["hla_C1"].values)
+    peptides_df["hla_C2"] = parse_allele_names(peptides_df["hla_C2"].values)
+
+    # load in fasta sequences
+    fasta_dictionary = {}
+    fasta_names = peptides_df.fasta.unique()
+    for f in fasta_names:
+        fasta_dictionary[f] = str(
+            SeqIO.read(os.path.join(args.fasta_dir, f"{f}.fasta"), "fasta").seq
+        )
+
+    # find position of each peptide within its corresponding fasta
+    peptides_df["start"] = peptides_df.apply(
+        lambda row: fasta_dictionary[row["fasta"]].find(row["peptide"]), axis=1
+    )
+    if peptides_df["start"].min() < 0:
+        raise ValueError(
+            "One or more peptide could not be found in the fastas. Check these peptides:",
+            peptides_df[peptides_df["start"] < 0].peptide.values,
+        )
+
+    # make a temporary directory in which to save newly generated files
+    temp_dir = os.path.join(args.fasta_dir, args.cache_name)
+    os.mkdir(temp_dir)
+
+    # run pepsickle algorithm on FASTAs
+    # TODO: decide whether to hold this in memory or in tempfiles
+    pepsickle_dictionary = {}
+    pepsickle_version = configuration["pepsickle_version"]
+    for f in verbose_tqdm(
+        fasta_names,
+        args.verbosity,
+        desc="Running Pepsickle for provided fastas",
+    ):
+        pepsickle_dictionary[f] = run_algos(
+            os.path.join(args.fasta_dir, f"{f}.fasta"),
+            pepsickle_version,
+            "I",
+        )
+
+    # find peptide precursors/products
+    peptides_list = []
+    peptide_lengths = np.arange(8, configuration["max_length"] + 1)[::-1]
+    for i in range(peptides_df.shape[0]):
+        peps = find_peptide_precursors(
+            peptides_df["length"].values[i],
+            fasta_dictionary[peptides_df.fasta.values[i]],
+            peptides_df["start"].values[i],
+            peptide_lengths,
+        )
+        peptides_list.append(peps)
+    peptides_list = np.array(peptides_list)
+    pickle.dump(
+        peptides_list, open(os.path.join(temp_dir, "peptide_list.pkl"), "wb")
+    )
+
+    # calculate peptide-specific parameters
+    # 1. Proteasomal digestion
+    gPs = np.zeros(peptides_list.shape)
+    for i in verbose_tqdm(
+        range(gPs.shape[0]),
+        args.verbosity,
+        desc="Calculating proteasomal product probabilities",
+    ):
+        startpoints = np.array(
+            [
+                peptides_df["start"].values[i]
+                + peptides_df["length"].values[i]
+                - x
+                for x in peptide_lengths
+            ]
+        )
+        # predict formation probabilities for peptides which physically exist
+        predicted_gPs = get_proteasome_product_probabilities_from_preprocessed(
+            pepsickle_dictionary[peptides_df["fasta"].values[i]],
+            pepsickle_version,
+            startpoints[startpoints >= 0],
+            peptide_lengths[startpoints >= 0],
+        )
+        # replace the remaining peptides with zeros
+        gPs[i, :] = np.hstack(
+            [np.zeros(np.sum([startpoints < 0])), predicted_gPs]
+        )
+    np.save(os.path.join(temp_dir, "gPs.npy"), args.proteasome_ratio * gPs)
+
+    # 2. Cytosolic aminopeptidase parameters
+    cyt_amin_rates = args.cyt_amin_ratio * np.array(
+        [get_cytamin_rates(p) for p in peptides_list]
+    )
+    np.save(os.path.join(temp_dir, "cytamin_out.npy"), cyt_amin_rates)
+    np.save(
+        os.path.join(temp_dir, "cytamin_in.npy"),
+        np.hstack(
+            [np.zeros((cyt_amin_rates.shape[0], 1)), cyt_amin_rates[:, :-1]]
+        ),
+    )
+
+    # 3. TAP binding affinity
+    TAP_BAs = np.array(
+        [
+            predict_tap_binding_affinities(p, args.host_organism)
+            for p in verbose_tqdm(
+                peptides_list,
+                args.verbosity,
+                desc="Predicting TAP binding affinities",
+            )
+        ]
+    )
+    np.save(os.path.join(temp_dir, "TAP_BAs.npy"), TAP_BAs)
+
+    # 4. ERAP1 kcats
+    erap1_kcats = np.array(
+        [
+            get_erap1_kcats(p)
+            for p in verbose_tqdm(
+                peptides_list, args.verbosity, desc="Predicting ERAP1 kcats"
+            )
+        ]
+    )
+    np.save(os.path.join(temp_dir, "erap1_kcat_out.npy"), erap1_kcats)
+    np.save(
+        os.path.join(temp_dir, "erap1_kcat_in.npy"),
+        np.hstack([np.zeros((erap1_kcats.shape[0], 1)), erap1_kcats[:, :-1]]),
+    )
+
+    # 5. MHC-I binding affinity prediction and tapasin dependence prediction
+    peptides_list = np.array(
+        [
+            [peptide.replace("X", "A") for peptide in sublist]
+            for sublist in peptides_list
+        ]
+    )  # MHC-I algos can't handle X so replace with alanine
+    binding_rates = np.zeros((peptides_list.shape[0], 6))
+    affinity_algorithm = configuration["mhci_affinity_algorithm"]
+    # batch by MHC-I allele and peptide length
+    for lidx, locus in enumerate(
+        ["hla_A1", "hla_A2", "hla_B1", "hla_B2", "hla_C1", "hla_C2"]
+    ):
+        mhci_affinities = 50000 * np.ones(peptides_list.shape)
+        for allele in verbose_tqdm(
+            peptides_df[locus].unique(),
+            args.verbosity,
+            desc=f"Predicting peptide-MHC binding affinities using {affinity_algorithm}, looping over unique MHC-I alleles for {locus}",
+        ):
+            # work out the binding rate using tapasin dependence for this allele
+            allele_mask = peptides_df[locus].values == allele
+            binding_rates[allele_mask, lidx] = get_allele_bER(allele)
+            # we skip 16mers to 13mers --> MHCmotif atlas showing poorly presented
+            for col in range(4, peptides_list.shape[1]):
+                if affinity_algorithm == "NetMHC":
+                    mhci_affinities[allele_mask, col] = get_netmhc(
+                        allele,
+                        peptides_list[allele_mask, col],
+                    )
+                elif affinity_algorithm == "NetMHCpan":
+                    mhci_affinities[allele_mask, col] = get_netmhcpan(
+                        allele,
+                        peptides_list[allele_mask, col],
+                    )
+                else:
+                    raise ValueError(
+                        "Affinity algorithm must currently be either NetMHC or NetMHCpan!"
+                    )
+        np.save(
+            os.path.join(temp_dir, f"mhci_affinities_{locus[-2:]}.npy"),
+            mhci_affinities,
+        )
+    np.save(os.path.join(temp_dir, "bERs.npy"), binding_rates)
+
+    # run mechanistic model in Julia
+    if args.verbosity is True:
+        print("Running mechanistic model in Julia")
+    subprocess.run(
+        [
+            "julia",
+            os.path.join(current_dir, "mechanistic_model_MA.jl"),
+            temp_dir,
+            args.yaml,
+        ],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
+
+    # extract the classi_presentation
+    julia_results = np.load(os.path.join(temp_dir, "pmhc_levels.npy"))
+    print(julia_results.shape)
+    for lidx, locus in enumerate(
+        ["hla_A1", "hla_A2", "hla_B1", "hla_B2", "hla_C1", "hla_C2"]
+    ):
+        peptides_df[f"predicted_pmhc_{locus[-2:]}"] = julia_results[
+            np.arange(len(peptides_df)),
+            (configuration["max_length"] - 7) * lidx
+            + configuration["max_length"]
+            - peptides_df["length"].values,
+        ]
 
     # save the peptides_df as results
     if args.verbosity is True:

@@ -223,6 +223,7 @@ outputs = zeros(size(gPs))
     # solve the endogenous problem (no non-self peptide)
     prob_endog = ODEProblem(endogenous_derivative!, startp, tspan_endog, bs[i, 1])
     sol_endog = solve(prob_endog, Rodas4(), saveat=t_endog)
+    print(sol_endog.u[end])
 
     # Solve for the equilibrium point
     x0 = sol_endog.u[end]

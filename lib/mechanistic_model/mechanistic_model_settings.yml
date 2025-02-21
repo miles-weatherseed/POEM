@@ -28,6 +28,9 @@ hearn_fitted_parameters:
   V_TAP : 566.068 # this converts units of nM to raw numbers of molecules
   g_self_cyt: 2000000
 
+transcriptomics:
+  translational_efficiency: 0.1
+
 configuration:
   max_length : 16
   pepsickle_version: 0
